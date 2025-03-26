@@ -1,24 +1,52 @@
-require("dotenv").config();
-const express = require("express");
-const mongoose = require("mongoose");
-const cors = require("cors");
-const cookieParser = require("cookie-parser");
-const authRoutes = require("./routes/authRoutes");
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import connectDB from './config/db.js';
+import { errorHandler } from './utils/errorHandler.js';
+import authRoutes from './routes/authRoutes.js';
+import landRecordRoutes from './routes/landRecordRoutes.js';
 
+// Load environment variables
+import dotenv from 'dotenv';
+dotenv.config();
 
 const app = express();
-app.use(express.json());
+
+// Connect to MongoDB
+connectDB();
+
+// Middleware
 app.use(cors());
-app.use(cookieParser());
+app.use(helmet());
+app.use(express.json());
 
-// Database Connection
-mongoose.connect(process.env.MONGO_URI)
-.then(() => console.log("MongoDB Connected"))
-.catch(err => console.log(err));
+// Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/land-records', landRecordRoutes);
 
+// Global Error Handler
+app.use(errorHandler);
 
-app.use("/api/auth", authRoutes);
+// Handle undefined routes
+app.all('*', (req, res, next) => {
+  res.status(404).json({
+    status: 'error',
+    message: `Cannot find ${req.originalUrl} on this server`
+  });
+});
 
-// Start Server
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+const PORT = process.env.PORT || 3000;
+const server = app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
+
+// Graceful shutdown
+process.on('unhandledRejection', (err) => {
+  console.error('UNHANDLED REJECTION! Shutting down...');
+  console.error(err);
+  server.close(() => {
+    process.exit(1);
+  });
+});
+
+export default app;
